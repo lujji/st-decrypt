@@ -3,12 +3,68 @@ package st_decrypt;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+class Dumper {
+
+    private static FileOutputStream fstream;
+
+    public Dumper(String filename) {
+        try {
+            fstream = new FileOutputStream(filename);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(Dumper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    /**
+     * Dump byte array to a file
+     *
+     * @param dump byte array
+     * @param filename
+     */
+    static void dump(byte[] dump, String filename) {
+        if (dump == null) {
+            return;
+        }
+        FileOutputStream fos = null;
+        try {
+            fos = new FileOutputStream(filename);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(ST_decrypt.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        try {
+            fos.write(dump, 0, dump.length);
+            fos.flush();
+            fos.close();
+        } catch (IOException ex) {
+            Logger.getLogger(ST_decrypt.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    void append(byte[] b) {
+        try {
+            fstream.write(b);
+        } catch (IOException ex) {
+            Logger.getLogger(Dumper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    void close() {
+        try {
+            fstream.close();
+        } catch (IOException ex) {
+            Logger.getLogger(Dumper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}
 
 class Crypto {
 
@@ -42,10 +98,25 @@ public class ST_decrypt {
      */
     private static boolean encrypt;
 
+    private static Dumper dumper;
+
     public static void main(String[] args) {
-        //byte[] key = new byte[16];
-        //str_to_arr("I am key, wawawa", key);
+        if (args.length != 3) {
+            out("Usage: st_decrypt.jar <encrypt|decrypt> input_file output_file");
+            return;
+        }
+        if (args[0].equals("encrypt")) {
+            encrypt = true;
+        } else if (args[0].equals("decrypt")) {
+            encrypt = false;
+        } else {
+            out("Usage: st_decrypt.jar <encrypt|decrypt> input_file output_file");
+            return;
+        }
+
+        dumper = new Dumper(args[2]);
         dump_fw(args[1]);
+        dumper.close();
         out("Done!\n");
     }
 
@@ -101,19 +172,9 @@ public class ST_decrypt {
         } else {
             decrypt(array, array2, array3, array.length);
         }
-        
-        /* This sends the firmware to device */
-//        int n4;        
-//        for (int n3 = 0, length = array2.length; length > 0 && a == 0L; length -= n4, n3 += n4) {
-//            if (length > n2) {
-//                n4 = n2;
-//            } else {
-//                n4 = length;
-//            }
-//            a = this.d.a(n, Arrays.copyOfRange(array2, n3, n3 + n4), n4);
-//            this.b.a();
-//            n += n4;
-//        }
+
+        /* Send chunk of data to device */
+        dumper.append(array2);
         return a;
     }
 
@@ -152,7 +213,7 @@ public class ST_decrypt {
         }
     }
 
-    private static int pack_u32(final int n, final int n2, final int n3, final int n4) { // a(4)
+    private static int pack_u32(final int n, final int n2, final int n3, final int n4) {
         return (n << 24 & 0xFF000000) + (n2 << 16 & 0xFF0000) + (n3 << 8 & 0xFF00) + (n4 & 0xFF);
     }
 
@@ -198,8 +259,7 @@ public class ST_decrypt {
     }
 
     /**
-     * core.a.a - encrypt firmware??
-     *
+     * Encrypt firmware file
      */
     static void encrypt(final byte[] src, final byte[] dest, byte[] key, int len) {
         final byte[] array3 = new byte[16];
@@ -263,7 +323,7 @@ public class ST_decrypt {
     }
 
     /**
-     * core.a.b - decrypt firmware file
+     * Decrypt firmware file
      *
      * @param src firmware file
      * @param dest destination array
