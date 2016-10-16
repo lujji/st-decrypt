@@ -11,6 +11,7 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.cli.*;
 
 class Dumper {
 
@@ -98,30 +99,41 @@ public class ST_decrypt {
      */
     private static boolean encrypt;
 
+    private static String encryptionKey;
+
     private static Dumper dumper;
 
     public static void main(String[] args) {
-        if (args.length != 3) {
-            out("Usage: st_decrypt.jar <encrypt|decrypt> input_file output_file");
-            return;
-        }
-        if (args[0].equals("encrypt")) {
-            encrypt = true;
-        } else if (args[0].equals("decrypt")) {
-            encrypt = false;
-        } else {
-            out("Usage: st_decrypt.jar <encrypt|decrypt> input_file output_file");
-            return;
+        CommandLineParser parser = new DefaultParser();
+        Options options = new Options();
+        String help = "st_decrypt.jar [-e] -k <key> -i <input> -o <output>";
+        options.addOption("k", "key", true, "encryption key");
+        options.addOption("e", "encrypt", false, "encrypt binary");
+        options.addOption("i", "input", true, "input file");
+        options.addOption("o", "output", true, "output file");
+        HelpFormatter formatter = new HelpFormatter();
+        CommandLine opts = null;
+        try {
+            opts = parser.parse(options, args);
+            if (opts.hasOption("key")
+                    && opts.hasOption("input")
+                    && opts.hasOption("output")) {
+                encryptionKey = opts.getOptionValue("key");
+            } else {
+                formatter.printHelp(help, options);
+                System.exit(1);
+            }
+            encrypt = opts.hasOption("encrypt");
+        } catch (ParseException exp) {
+            System.out.println(exp.getMessage());
+            formatter.printHelp(help, options);
+            System.exit(1);
         }
 
-        dumper = new Dumper(args[2]);
-        dump_fw(args[1]);
+        dumper = new Dumper(opts.getOptionValue("output"));
+        dump_fw(opts.getOptionValue("input"));
         dumper.close();
-        out("Done!\n");
-    }
-
-    static void out(Object o) {
-        System.out.println(o);
+        System.out.println("Done!");
     }
 
     static long getFileLen(String file) {
@@ -165,7 +177,7 @@ public class ST_decrypt {
         long a = 0L;
         final byte[] array2 = new byte[4 * ((array.length + 3) / 4)];
         final byte[] array3 = new byte[16];
-        str_to_arr("best performance", array3);
+        str_to_arr(encryptionKey, array3);
 
         if (encrypt) {
             encrypt(array, array2, array3, array.length);
@@ -192,7 +204,7 @@ public class ST_decrypt {
             }
         } catch (IOException ex) {
             System.out.println("Failure reading file: " + ex.getMessage());
-            return 28L;
+            System.exit(1);
         }
         return a;
     }
@@ -204,6 +216,7 @@ public class ST_decrypt {
             fis = new FileInputStream(f);
         } catch (Exception ex) {
             System.out.println("Invalid file name");
+            System.exit(1);
         }
         try (BufferedInputStream bufferedInputStream = new BufferedInputStream(fis)) {
             long len = getFileLen(file);
